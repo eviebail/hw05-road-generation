@@ -36,6 +36,7 @@ class ShaderProgram {
   unifEye: WebGLUniformLocation;
   unifUp: WebGLUniformLocation;
   unifDimensions: WebGLUniformLocation;
+  unifSampler2D: WebGLUniformLocation; 
 
   constructor(shaders: Array<Shader>) {
     this.prog = gl.createProgram();
@@ -61,6 +62,7 @@ class ShaderProgram {
     this.unifEye   = gl.getUniformLocation(this.prog, "u_Eye");
     this.unifRef   = gl.getUniformLocation(this.prog, "u_Ref");
     this.unifUp   = gl.getUniformLocation(this.prog, "u_Up");
+    this.unifSampler2D = gl.getUniformLocation(this.prog, "u_RenderedTexture");
   }
 
   use() {
@@ -127,6 +129,8 @@ class ShaderProgram {
 
   draw(d: Drawable) {
     this.use();
+
+    gl.uniform1i(this.unifSampler2D, 0);
 
     if (this.attrPos != -1 && d.bindPos()) {
       gl.enableVertexAttribArray(this.attrPos);
