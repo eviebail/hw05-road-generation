@@ -26,6 +26,10 @@ class ShaderProgram {
   attrCol: number; // This time, it's an instanced rendering attribute, so each particle can have a unique color. Not per-vertex, but per-instance.
   attrTranslate: number; // Used in the vertex shader during instanced rendering to offset the vertex positions to the particle's drawn position.
   attrUV: number;
+  attrR1: number;
+  attrR2: number;
+  attrR3: number;
+  attrScale: number;
 
   unifModel: WebGLUniformLocation;
   unifModelInvTr: WebGLUniformLocation;
@@ -36,7 +40,8 @@ class ShaderProgram {
   unifEye: WebGLUniformLocation;
   unifUp: WebGLUniformLocation;
   unifDimensions: WebGLUniformLocation;
-  unifSampler2D: WebGLUniformLocation; 
+  unifSampler2D: WebGLUniformLocation;
+  unifState: WebGLUniformLocation;
 
   constructor(shaders: Array<Shader>) {
     this.prog = gl.createProgram();
@@ -54,6 +59,10 @@ class ShaderProgram {
     this.attrCol = gl.getAttribLocation(this.prog, "vs_Col");
     this.attrTranslate = gl.getAttribLocation(this.prog, "vs_Translate");
     this.attrUV = gl.getAttribLocation(this.prog, "vs_UV");
+    this.attrR1 = gl.getAttribLocation(this.prog, "vs_R1");
+    this.attrR2 = gl.getAttribLocation(this.prog, "vs_R2");
+    this.attrR3 = gl.getAttribLocation(this.prog, "vs_R3");
+    this.attrScale = gl.getAttribLocation(this.prog, "vs_Scale");
     this.unifModel      = gl.getUniformLocation(this.prog, "u_Model");
     this.unifModelInvTr = gl.getUniformLocation(this.prog, "u_ModelInvTr");
     this.unifViewProj   = gl.getUniformLocation(this.prog, "u_ViewProj");
@@ -63,6 +72,7 @@ class ShaderProgram {
     this.unifRef   = gl.getUniformLocation(this.prog, "u_Ref");
     this.unifUp   = gl.getUniformLocation(this.prog, "u_Up");
     this.unifSampler2D = gl.getUniformLocation(this.prog, "u_RenderedTexture");
+    this.unifState = gl.getUniformLocation(this.prog, "u_MapState");
   }
 
   use() {
@@ -127,6 +137,13 @@ class ShaderProgram {
     }
   }
 
+  setState(state: vec4) {
+    this.use();
+    if(this.unifState !== -1) {
+      gl.uniform4f(this.unifState, state[0], state[1], state[2], state[3]);
+    }
+  }
+
   draw(d: Drawable) {
     this.use();
 
@@ -162,6 +179,30 @@ class ShaderProgram {
       gl.vertexAttribDivisor(this.attrUV, 0); // Advance 1 index in pos VBO for each vertex
     }
 
+    if (this.attrR1 != -1 && d.bindR1()) {
+      gl.enableVertexAttribArray(this.attrR1);
+      gl.vertexAttribPointer(this.attrR1, 3, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribDivisor(this.attrR1, 1); // Advance 1 index in translate VBO for each drawn instance
+    }
+
+    if (this.attrR2 != -1 && d.bindR2()) {
+      gl.enableVertexAttribArray(this.attrR2);
+      gl.vertexAttribPointer(this.attrR2, 3, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribDivisor(this.attrR2, 1); // Advance 1 index in translate VBO for each drawn instance
+    }
+
+    if (this.attrR3 != -1 && d.bindR3()) {
+      gl.enableVertexAttribArray(this.attrR3);
+      gl.vertexAttribPointer(this.attrR3, 3, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribDivisor(this.attrR3, 1); // Advance 1 index in translate VBO for each drawn instance
+    }
+
+    if (this.attrScale != -1 && d.bindScale()) {
+      gl.enableVertexAttribArray(this.attrScale);
+      gl.vertexAttribPointer(this.attrScale, 3, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribDivisor(this.attrScale, 1); // Advance 1 index in translate VBO for each drawn instance
+    }
+
     // TODO: Set up attribute data for additional instanced rendering data as needed
 
     d.bindIdx();
@@ -183,6 +224,10 @@ class ShaderProgram {
     if (this.attrCol != -1) gl.disableVertexAttribArray(this.attrCol);
     if (this.attrTranslate != -1) gl.disableVertexAttribArray(this.attrTranslate);
     if (this.attrUV != -1) gl.disableVertexAttribArray(this.attrUV);
+    if (this.attrR1 != -1) gl.disableVertexAttribArray(this.attrR1);
+    if (this.attrR2 != -1) gl.disableVertexAttribArray(this.attrR2);
+    if (this.attrR3 != -1) gl.disableVertexAttribArray(this.attrR3);
+    if (this.attrScale != -1) gl.disableVertexAttribArray(this.attrScale);
   }
 };
 
