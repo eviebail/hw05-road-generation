@@ -14,7 +14,7 @@ export default class Turtle {
 
 
   constructor() {
-    this.position = vec3.fromValues(0,0,0);
+    this.position = vec3.fromValues(Math.random() * 2.0 - 1.0,Math.random() * 2.0 - 1.0,Math.random()* 2.0 - 1.0);
     this.orientation = vec3.fromValues(0,1,0);
     this.forward = vec3.fromValues(0,1,0);
     this.right = vec3.fromValues(1,0,0);

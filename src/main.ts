@@ -198,15 +198,11 @@ function main() {
       //console.log(pixels[window.innerWidth * window.innerHeight * 4 - 4] / 255.0 + ", " + pixels[window.innerWidth * window.innerHeight * 4 - 3] / 255.0 + ", " + pixels[window.innerWidth * window.innerHeight * 4 - 2] / 255.0);
       //now pass colorArray to turtle!
       //console.log("ARE YOU ALIVE???" + colorArray[0][0]);
-      system = new RoadSystem(pixels,5.0);
+      system = new RoadSystem(pixels,5.0, window.innerHeight, window.innerWidth);
     }
 
     // Initial call to load scene
     loadScene();
-
-    //(x + width*y) for indexing! (also *4 w/o converting to vec4s)
-
-    
 
     // Tell OpenGL to render to the viewport's frame buffer
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
