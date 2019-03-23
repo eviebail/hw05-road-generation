@@ -11,16 +11,50 @@ export default class Turtle {
     up : vec3;
     depth : number;
     scale : vec3;
+    numBranches : number;
 
 
   constructor() {
-    this.position = vec3.fromValues(Math.random() * 2.0 - 1.0,Math.random() * 2.0 - 1.0,Math.random()* 2.0 - 1.0);
+    let pos1 = vec3.fromValues(0.1, 0.5, 0.0);
+    let pos2 = vec3.fromValues(0.6, -0.7, 0.0);
+    let pos3 = vec3.fromValues(0.5, 0.5, 0.0);
+    let pos4 = vec3.fromValues(-0.4, -0.9, 0.0);
+    let prob = Math.random();
+
+    if (prob < 0.25) {
+      this.position = pos1;
+    } else if (prob < 0.50) {
+      this.position = pos2;
+    } else if (prob < 0.75) {
+      this.position = pos3;
+    } else {
+      this.position = pos4;
+    }
+    //(Math.random() * 2.0 - 1.0,Math.random() * 2.0 - 1.0,Math.random()* 2.0 - 1.0);
     this.orientation = vec3.fromValues(0,1,0);
     this.forward = vec3.fromValues(0,1,0);
     this.right = vec3.fromValues(1,0,0);
     this.up = vec3.fromValues(0,0,1);
-    this.scale = vec3.fromValues(0.01,0.1,1.0);
+    this.scale = vec3.fromValues(0.005,0.1,1.0);
     this.depth = 0.0;
+    let rand = Math.random();
+    this.numBranches = Math.floor((Math.pow(rand, 1.0) * 2.0) + 1.0);
+  }
+
+  setInitPos(type : number) {
+    let pos1 = vec3.fromValues(0.1, 0.5, 0.0);
+    let pos2 = vec3.fromValues(0.6, -0.7, 0.0);
+    let pos3 = vec3.fromValues(0.7, 0.2, 0.0);
+    let pos4 = vec3.fromValues(-0.5, -0.9, 0.0);
+    if (type == 0) {
+      this.position = pos1;
+    } else if (type == 1) {
+      this.position = pos2;
+    } else if (type == 2) {
+      this.position = pos3;
+    } else {
+      this.position = pos4;
+    }
   }
 
   copy(t : Turtle) {
@@ -29,6 +63,7 @@ export default class Turtle {
     this.forward = vec3.fromValues(t.forward[0], t.forward[1], t.forward[2]);
     this.right = vec3.fromValues(t.right[0], t.right[1], t.right[2]);
     this.up = vec3.fromValues(t.up[0], t.up[1], t.up[2]);
+    this.scale = vec3.fromValues(t.scale[0], t.scale[1], t.scale[2]);
     this.depth = t.depth;
   }
 

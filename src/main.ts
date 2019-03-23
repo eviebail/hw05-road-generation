@@ -12,9 +12,10 @@ import RoadSystem from './RoadSystem';
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
 const controls = {
-  Height_Map:  1,
-  Density_Map: 0,
-  Land_Water_Mode: 0
+  Height_Map:  0,
+  Density_Map: 1,
+  Land_Water_Mode: 0,
+  Population_Density: 0
 };
 
 let square: Square;
@@ -45,6 +46,7 @@ function loadScene() {
   console.log("Length " + n);
   
   for(let i = 0; i < n; i++) {
+    var pos = vec3.create();
     for(let j = 0; j < n; j++) {
       let position : vec3 = data[0][i];
       let r1 : vec3 = data[1][i];
@@ -52,7 +54,9 @@ function loadScene() {
       let r3 : vec3 = data[3][i];
       let scale : vec3 = data[4][i];
       //let depth : vec3 = data[5][i];
-      console.log("Offset: " + position[0] + ", " + position[1] + ", " + position[2]);
+
+      pos = position;
+      
       offsetsArray.push(position[0]);
       offsetsArray.push(position[1]);
       offsetsArray.push(position[2]);
@@ -73,11 +77,21 @@ function loadScene() {
       scaleArray.push(scale[1]);
       scaleArray.push(scale[2]);
 
-      colorsArray.push(1.0);
-      colorsArray.push(1.0);
-      colorsArray.push(1.0);
-      colorsArray.push(1.0); // Alpha channel
+      if (i == 0) {
+        colorsArray.push(1.0);
+        colorsArray.push(1.0);
+        colorsArray.push(1.0);
+        colorsArray.push(1.0); // Alpha channel
+      } else {
+        colorsArray.push((n - i + 1) / n);
+        colorsArray.push((n - i + 1) / n);
+        colorsArray.push((n - i + 1) / n);
+        colorsArray.push(1.0); // Alpha channel
+      }
+
     }
+    //console.log("HIII");
+    //console.log("Offset: " + pos[0] + ", " + pos[1] + ", " + pos[2] + "\n");
   }
   let offsets: Float32Array = new Float32Array(offsetsArray);
   let colors: Float32Array = new Float32Array(colorsArray);
@@ -103,6 +117,7 @@ function main() {
   gui.add(controls, 'Height_Map', 0, 1).step(1);
   gui.add(controls, 'Density_Map', 0, 1).step(1);
   gui.add(controls, 'Land_Water_Mode', 0, 1).step(1);
+  gui.add(controls, 'Population_Density', 0, 1).step(0.5);//Population_Density
 
   // get canvas and webgl context
   const canvas = <HTMLCanvasElement> document.getElementById('canvas');

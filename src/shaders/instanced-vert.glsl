@@ -28,7 +28,7 @@ void main()
                           vec3(0.0, 1.0, 0.0),
                           vec3(vs_Translate.x, vs_Translate.y, 1.0));
     
-    mat3 rotate = transpose(mat3(vs_R1,
+    mat3 rotate = (mat3(vs_R1,
                   vs_R2,
                   vs_R3));
     mat3 scale = mat3(vec3(vs_Scale.x, 0.0, 0.0),

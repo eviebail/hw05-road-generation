@@ -101,7 +101,8 @@ float worley (float c_size, float multiplier) {
 void main() {
   vec2 pos = fs_Pos * 2.0;
   float height = fbm(pos.x, pos.y);
-  float pop_dens = 1.0 - (worley(0.7, 0.5) + 0.7*height);
+  float pop_dens = 1.0 - (worley(0.5, 0.5) + 0.5*height);
+  pop_dens = fbm(pop_dens, pop_dens);
   //height = step_map(height);
   height = log(height + 0.7);//pow(height, 0.8);//smoothstep(0.2, 1.0, height);
   if (height < 0.2) {
