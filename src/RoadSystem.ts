@@ -17,6 +17,7 @@ export default class RoadSystem {
     heightDensityData : Uint8Array;
     height : number;
     width : number;
+    max : number;
 
     constructor(data : Uint8Array, numIter : number, screenHeight : number, screenWidth : number) {
         this.current = 0;
@@ -28,6 +29,11 @@ export default class RoadSystem {
             this.heightDensityData[i] = data[i];
         }
     }
+
+    setMaxLength(length : number) {
+        this.max = length;
+    }
+
     runSystem() : vec3[][] {
         let pos = this.drawHighways(0);
 
@@ -72,7 +78,6 @@ export default class RoadSystem {
         result.push(r5);
         result.push(r6);
 
-        console.log(result[0].length + ": " + pos[0].length);
         return result;
     }
 
@@ -81,13 +86,12 @@ export default class RoadSystem {
         vec3.add(pos, pos, vec3.fromValues(1.0,1.0,1.0));
         vec3.mul(pos, pos, [0.5, 0.5,0.5]);
         vec3.mul(pos, pos, [this.width, this.height, 1.0]);
+
         //(x + width*y) for indexing! (also *4 w/o converting to vec4s)
         let x = Math.floor(pos[0]);
         let y = Math.floor(pos[1]);
         var green = this.heightDensityData[(x + this.width * y)*4.0 + 1.0];
         var blue = this.heightDensityData[(x + this.width * y)*4.0 + 2.0];
-
-        //console.log("Blue: " + blue + " : Green " + green);
         
         if (blue > green) {
             return true;
@@ -101,6 +105,7 @@ export default class RoadSystem {
         vec3.add(pos, pos, vec3.fromValues(1.0,1.0,1.0));
         vec3.mul(pos, pos, [0.5, 0.5,0.5]);
         vec3.mul(pos, pos, [this.width, this.height, 1.0]);
+
         //(x + width*y) for indexing! (also *4 w/o converting to vec4s)
         let x = Math.floor(pos[0]);
         let y = Math.floor(pos[1]);
@@ -116,7 +121,6 @@ export default class RoadSystem {
     }
 
     intersect(edge : Edge) : boolean {
-        //console.log("HIYA!!" + this.edges.length);
         let minIsect : Intersection = new Intersection();
         let intersects = false;
         for (let i = 0; i < this.edges.length; i++) {
@@ -132,26 +136,46 @@ export default class RoadSystem {
             }
         }
         if (intersects) {
-            //console.log("HI!");
             let l = vec2.dist(vec2.fromValues(minIsect.point[0], minIsect.point[1]), 
                               vec2.fromValues(edge.v1[0], edge.v1[1]));
             if (l < 0.000001) {
-                return;
+                return false;
             }
             edge.v2 = vec3.fromValues(minIsect.point[0], minIsect.point[1], 1.0);
-            //console.log("--------------------------------");
-            console.log("Intersect: " + minIsect.point[0] + ", " + minIsect.point[1]);
-            //console.log("Old Length" + edge.length);
             edge.length = l;
-            //console.log("New Length" + edge.length);
         }
         return intersects;
     }
 
+    snap(edge : Edge) : boolean {
+        let minIsect : Intersection = new Intersection();
+        let snaps = false;
+        for (let i = 0; i < this.highways.length; i++) {
+            let isect : Intersection = new Intersection();
+            if (isect.intersect(edge, this.highways[i])) {
+                snaps = true;
+                //check min dist from origin
+                let dist = vec2.dist(vec2.fromValues(edge.v1[0], edge.v1[1]), isect.point);//isect.point
+                let dist2 = vec2.dist(vec2.fromValues(edge.v1[0], edge.v1[1]), minIsect.point);
+                if (dist < dist2) {
+                    minIsect.point = vec2.fromValues(isect.point[0], isect.point[1]);
+                }
+            }
+        }
+        if (snaps) {
+            let l = vec2.dist(vec2.fromValues(minIsect.point[0], minIsect.point[1]), 
+                              vec2.fromValues(edge.v1[0], edge.v1[1]));
+            if (l >= 100) {
+                return false;
+            }
+            edge.v2 = vec3.fromValues(minIsect.point[0], minIsect.point[1], 1.0);
+
+            edge.length = l;
+        }
+        return snaps;
+    }
+
     drawHighways(type : number) : vec3[][] {
-        //let value = this.heightDensityData[0];
-        //console.log("/////" + value[0] + ", " + value[1] + ", " + value[2]);
-        //take the grammar and convert it to executable functions!
         let pos : vec3[] = new Array();
         let r1 : vec3[] = new Array();
         let r2 : vec3[] = new Array();
@@ -159,53 +183,31 @@ export default class RoadSystem {
         let scale : vec3[] = new Array();
         let depth : vec3[] = new Array();
 
+        //place a road at the initial position!
         this.turtleHistory.push(new Turtle());
-        while (this.isInWater(this.turtleHistory[0].position)) {
-            this.turtleHistory.pop();
-            this.turtleHistory.push(new Turtle());
-        }
         this.turtleHistory[0].setInitPos(type);
 
-        //place a road at the initial position!
-        // pos.push(vec3.fromValues(t.position[0], t.position[1], t.position[2]));
-        // r1.push(vec3.fromValues(1, 0, 0));
-        // r2.push(vec3.fromValues(0,1,0));
-        // r3.push(vec3.fromValues(0,0,1));
-        // scale.push(vec3.fromValues(t.scale[0], t.scale[1], t.scale[2]));
-        // depth.push(vec3.fromValues(t.depth, t.depth, t.depth));
-        let max = 60;
+        let max = this.max;
 
         while (this.turtleHistory.length != 0) {
             if (max <= 0) {
                 break;
             }
-
              var t : Turtle = this.turtleHistory.pop();
-             if (max == 60) {
+             if (max == this.max) {
                 t.numBranches = 2;
             }
-             //console.log("Popped turtle: " + t.position[0] + ", " + t.position[1] + ", " + t.position[2]);
-        
             if (t.numBranches == 2) {
                 let theta1 = 50.0;
                 let theta2 = -50.0;
                 
                 var t1 = new Turtle();
                 t1.copy(t);
-                //console.log("t1: " + t1.position[0] + ", " + t1.position[1] + ", " + t1.position[2]);
                 var t2 = new Turtle();
                 t2.copy(t);
-                //console.log("t2: " + t2.position[0] + ", " + t2.position[1] + ", " + t2.position[2]);
-
+                
                 var terminate : boolean = false;
-                //console.log("Left Old Pos: " + t1.position[0] + ", " + t1.position[1] + ", " + t1.position[2]);
-                // let endpt = vec3.fromValues(0,0,0);
-                // let o = vec3.fromValues(t1.orientation[0], t1.orientation[1], t1.orientation[2]);
-                // vec3.mul(o,o,vec3.fromValues(t1.scale[1], t1.scale[1], t1.scale[1]));
-                // vec3.add(endpt, t1.position, o);
-                // let end = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-                //console.log("Left Old Endpoint: " + end[0] + ", " + end[1]);
-
+                
                 let endpt = vec3.fromValues(0,0,0);
                 let o = vec3.fromValues(t1.orientation[0], t1.orientation[1], t1.orientation[2]);
                 vec3.mul(o,o,vec3.fromValues(t1.scale[1], t1.scale[1], t1.scale[1]));
@@ -213,12 +215,9 @@ export default class RoadSystem {
                 let inRange1 = this.inRange(t1.position) && this.inRange(endpt);
                 let w1 = this.isInWater(t1.position) && this.isInWater(endpt); 
                 let p = this.rotateTurtle(theta1, t1);
-                //console.log("Returned Pos: " + p[0][0] + ", " + p[0][1] + ", " + p[0][2]);
-                
+                     
                 if (inRange1 && !w1) {
                     let e = new Edge(t1.position, t1.orientation, t1.scale[1], t1.scale[0]);
-                    //console.log("Left New Origin: " + e.v1[0] + ", " + e.v1[1]);
-                    //console.log("Left New Endpoint: " + e.v2[0] + ", " + e.v2[1]);
                     let old = e.length;
                     if (this.intersect(e)) {
                         terminate = true;
@@ -226,19 +225,16 @@ export default class RoadSystem {
                     if(e.length < old) {
                         scale.push(vec3.fromValues(t1.scale[0],e.length,t1.scale[2]));
                         t1.scale[1] = e.length;
-                        //t1.position = e.v2;
                         
                     } else {
                         scale.push(vec3.fromValues(t1.scale[0],t1.scale[1],t1.scale[2]));
                     }
-                    // console.log("Left POS! " + p[0][0] + ", " + p[0][1]);
-                    // console.log("Scale " + t1.scale[1]);
                     pos.push(p[0]);
                     r1.push(p[1]);
                     r2.push(p[2]);
                     r3.push(p[3]);
-                    //scale.push(vec3.fromValues(t1.scale[0], length, t1.scale[2]));
                     depth.push(p[5]);
+
                     if (!terminate) {
                             //change the position to the endpoint before pushing back!
                             let endpt = vec3.fromValues(0,0,0);
@@ -246,24 +242,13 @@ export default class RoadSystem {
                             vec3.mul(o,o,vec3.fromValues(t1.scale[1], t1.scale[1], t1.scale[1]));
                             vec3.add(endpt, t1.position, o);
                             t1.position = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-                            //console.log("Translated Pos: " + t1.position[0] + ", " + t1.position[1] + ", " + t1.position[2]);
                             this.turtleHistory.push(t1);
                     } 
                     e.setAxes(t1.forward, t1.right, t1.up);
                     this.edges.push(e);
                     this.highways.push(e);
                 }
-                
-                //console.log("Right Old Pos: " + t2.position[0] + ", " + t2.position[1] + ", " + t2.position[2]);
-                // endpt = vec3.fromValues(0,0,0);
-                // o = vec3.fromValues(t2.orientation[0], t2.orientation[1], t2.orientation[2]);
-                // vec3.mul(o,o,vec3.fromValues(t2.scale[1], t2.scale[1], t2.scale[1]));
-                // vec3.add(endpt, t2.position, o);
-                // end = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-                //console.log("Right Old Endpoint: " + end[0] + ", " + end[1]);
 
-                
-                //console.log("Right New Pos: " + p[0][0] + ", " + p[0][1] + ", " + p[0][2]);
                 endpt = vec3.fromValues(0,0,0);
                 o = vec3.fromValues(t2.orientation[0], t2.orientation[1], t2.orientation[2]);
                 vec3.mul(o,o,vec3.fromValues(t2.scale[1], t2.scale[1], t2.scale[1]));
@@ -274,7 +259,6 @@ export default class RoadSystem {
                 terminate = false;
                 if (inRange2 && !w2) {
                     let e = new Edge(t2.position, t2.orientation, t2.scale[1], t2.scale[0]);
-                    //console.log("Right New Endpoint: " + e.v2[0] + ", " + e.v2[1]);
                     let old = e.length;
                     if (this.intersect(e)) {
                         terminate = true;
@@ -282,7 +266,6 @@ export default class RoadSystem {
                     if(e.length < old) {
                         scale.push(vec3.fromValues(t2.scale[0],e.length,t2.scale[2]));
                         t2.scale[1] = e.length;
-                        //t2.position = e.v2;
                     } else {
                         scale.push(vec3.fromValues(t2.scale[0],t2.scale[1],t2.scale[2]));
                     }
@@ -290,15 +273,14 @@ export default class RoadSystem {
                     r1.push(p[1]);
                     r2.push(p[2]);
                     r3.push(p[3]);
-                    //scale.push(vec3.fromValues(t2.scale[0], length, t2.scale[2]));
                     depth.push(p[5]);
+
                     if (!terminate) {
                             let endpt = vec3.fromValues(0,0,0);
                             let o = vec3.fromValues(t2.orientation[0], t2.orientation[1], t2.orientation[2]);
                             vec3.mul(o,o,vec3.fromValues(t2.scale[1], t2.scale[1], t2.scale[1]));
                             vec3.add(endpt, t2.position, o);
                             t2.position = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-                            //console.log("Translated Pos: " + t1.position[0] + ", " + t1.position[1] + ", " + t1.position[2]);
                             this.turtleHistory.push(t2);
                     }
                     e.setAxes(t2.forward, t2.right, t2.up);
@@ -312,13 +294,9 @@ export default class RoadSystem {
                 let randomDir2 = (Math.random() * 2.0 - 1.0)*90;
                 let randomDir3 = (Math.random() * 2.0 - 1.0)*90;
 
-                // console.log("-----------------------------------");
-                // console.log("Iteration " + i);
-
                 let pos1 = new Turtle();
                 pos1.copy(t);
                 pos1.moveRotate(1, randomDir1);
-                //let inRange1 = this.inRange(pos1.position);
 
                 let endpt = vec3.fromValues(0,0,0);
                 let o = vec3.fromValues(pos1.orientation[0], pos1.orientation[1], pos1.orientation[2]);
@@ -382,7 +360,6 @@ export default class RoadSystem {
                     if(e.length < length) {
                         scale.push(vec3.fromValues(t.scale[0],e.length,t.scale[2]));
                         t.scale[1] = e.length;
-                        //t.position = e.v2;
                     } else {
                         scale.push(vec3.fromValues(t.scale[0],t.scale[1],t.scale[2]));
                     }
@@ -391,7 +368,6 @@ export default class RoadSystem {
                     r1.push(p[1]);
                     r2.push(p[2]);
                     r3.push(p[3]);
-                    //scale.push(vec3.fromValues(t.scale[0], length, t.scale[2]));
                     depth.push(p[5]);
                     edge = e;
             } else if (d2 > d1 && d2 > d3 && !w2 && inRange2) {
@@ -405,7 +381,6 @@ export default class RoadSystem {
                     if(e.length < length) {
                         scale.push(vec3.fromValues(t.scale[0],e.length,t.scale[1]));
                         t.scale[1] = e.length;
-                        //t.position = e.v2;
                     } else {
                         scale.push(vec3.fromValues(t.scale[0],t.scale[1],t.scale[2]));
                     }
@@ -414,7 +389,6 @@ export default class RoadSystem {
                     r1.push(p[1]);
                     r2.push(p[2]);
                     r3.push(p[3]);
-                    //scale.push(vec3.fromValues(t.scale[0], length, t.scale[2]));
                     depth.push(p[5]);
                     edge = e;
             } else if (!w3 && inRange3) {
@@ -428,7 +402,6 @@ export default class RoadSystem {
                     if(e.length < length) {
                         scale.push(vec3.fromValues(t.scale[0],e.length,t.scale[2]));
                         t.scale[1] = e.length;
-                        //t.position = e.v2;
                     } else {
                         scale.push(vec3.fromValues(t.scale[0],t.scale[1],t.scale[2]));
                     }
@@ -437,7 +410,6 @@ export default class RoadSystem {
                     r1.push(p[1]);
                     r2.push(p[2]);
                     r3.push(p[3]);
-                    //scale.push(vec3.fromValues(t.scale[0], length, t.scale[2]));
                     depth.push(p[5]);
                     edge = e;
             }
@@ -458,43 +430,6 @@ export default class RoadSystem {
             max--;
     }
 
-    //console.log("numEdges: " + this.edges.length);
-
-        // let edge1 = new Edge(vec3.fromValues(0.4,0,0), vec3.fromValues(0,1,0), 0.1, 0.005);
-        // let edge2 = new Edge(vec3.fromValues(0.35,0.05,0), vec3.fromValues(1,0,0), 0.1, 0.005);
-        // this.edges.push(edge1);
-        // //this.edges.push(edge2);
-        
-        // let m = mat3.create();
-        // let i = mat3.create();
-        // mat3.identity(i);
-        // mat3.rotate(m, i, 45);
-        // //vec3.rotateY(y, 2, 3, );
-        // pos.push(vec3.fromValues(0.45,0.0,0));
-        // r1.push(vec3.fromValues(m[0],m[1],0));
-        // r2.push(vec3.fromValues(m[3],m[4],0));
-        // r3.push(vec3.fromValues(0,0,1));
-        // scale.push(vec3.fromValues(0.005,0.1,1.0)); //scale.push(vec3.fromValues(0.005,length,1.0));
-        // depth.push(vec3.fromValues(0.005,0.1,1.0));
-
-        // let length = edge2.length;
-        // this.intersect(edge2);
-        // if(edge2.length < length) {
-        //     scale.push(vec3.fromValues(0.005,edge2.length,1.0));
-        // } else {
-        //     scale.push(vec3.fromValues(0.005,length,1.0));
-        // }
-        // let m1 = mat3.create();
-        // let i1 = mat3.create();
-        // mat3.identity(i1);
-        // mat3.rotate(m1, i1, -25);
-        // pos.push(vec3.fromValues(0.4,0.0,0));
-        // r1.push(vec3.fromValues(m1[0],m1[1],0));
-        // r2.push(vec3.fromValues(m1[3],m1[4],0));
-        // r3.push(vec3.fromValues(0,0,1));
-        // scale.push(vec3.fromValues(0.005,0.1,1.0));
-        // depth.push(vec3.fromValues(0.005,0.1,1.0));
-
         let container : vec3[][] = new Array();
         container.push(pos);
         container.push(r1);
@@ -513,6 +448,8 @@ export default class RoadSystem {
         let scale : vec3[] = new Array();
         let depth : vec3[] = new Array();
 
+        let streets : Edge[] = new Array<Edge>();
+
         //empty out what's in there
         while (this.turtleHistory.length > 0) {
             this.turtleHistory.pop();
@@ -521,14 +458,14 @@ export default class RoadSystem {
         for (let i = 0; i < this.highways.length; i++) {
             let edge = this.highways[i];
             for (let j = 0; j < 4; j++) {
-                console.log("hi!!");
             //make n from main road
             let terminate = false;
             let offset = vec3.create();
             let o = vec3.fromValues(edge.direction[0], edge.direction[1], edge.direction[2]);
-            vec3.mul(o,o,vec3.fromValues(1.1 * j * edge.length / 3.0, 1.1 * j * edge.length / 3.0, 1.1 * j * edge.length / 3.0));
+            
+            vec3.mul(o,o,vec3.fromValues( j * edge.length / 3.0,  j * edge.length / 3.0, j * edge.length / 3.0));
             vec3.add(offset, edge.v1, o);
-            n.position = offset; //vec3.fromValues(edge.v1[0] + 1.1 * j * offset[0], edge.v1[1] + 1.1 * j * offset[1], edge.v1[2] + 1.1 * j * offset[2]);
+            n.position = offset; 
             n.forward = vec3.fromValues(edge.forward[0],edge.forward[1],edge.forward[2]);
             n.right = vec3.fromValues(edge.right[0],edge.right[1],edge.right[2]);
             n.up = vec3.fromValues(edge.up[0],edge.up[1],edge.up[2]);
@@ -551,7 +488,6 @@ export default class RoadSystem {
             this.intersect(e);
            if (e.length < length) {
                 terminate = true;
-                console.log("INTERSECTS OG!" + e.length + ", " + length);
                 scale.push(vec3.fromValues(n.scale[0],e.length,n.scale[2]));
             } else {
                 scale.push(vec3.fromValues(n.scale[0],length,n.scale[0]));
@@ -563,15 +499,16 @@ export default class RoadSystem {
             r3.push(p[3]);
             depth.push(p[5]);
             this.edges.push(e);
+            streets.push(e);
             } else {
-                console.log("OUT OF BOUNDS OG!" + e.length + ", " + length);
                 terminate = true;
             }
 
-            let max = 2;
+            let max = this.max / 4.0;
             while (!terminate && max != 0) {
                 max-=1;
                 //make a branch off of it
+                if (j != 3.0) {
                 let nine = new Turtle();
                 nine.copy(n);
                 let newPos = vec3.fromValues(0,0,0);
@@ -604,7 +541,9 @@ export default class RoadSystem {
                 r3.push(p[3]);
                 depth.push(p[5]);
                 this.edges.push(e);
+                streets.push(e);
                 }
+            }
                 
                 //move original forward
                 e = new Edge(n.position, n.orientation, n.scale[1], n.scale[0]);
@@ -630,7 +569,6 @@ export default class RoadSystem {
                     length = e.length;
                     this.intersect(e);
                 if (e.length < length) {
-                    console.log("INTERSECTION!" + e.length + ", " + length);
                     terminate = true;
                     scale.push(vec3.fromValues(n.scale[0],e.length,n.scale[2]));
                 } else {
@@ -643,48 +581,56 @@ export default class RoadSystem {
                 r3.push(p[3]);
                 depth.push(p[5]);
                 this.edges.push(e);
+                streets.push(e);
                 } else {
-                    console.log("OUT OF BOUNDS!" + e.length + ", " + length);
                     terminate = true;
                 } 
                 
             }
 
-            let nine = new Turtle();
-                nine.copy(n);
-                let newPos = vec3.fromValues(0,0,0);
-                let or = vec3.fromValues(n.orientation[0], n.orientation[1], n.orientation[2]);
-                vec3.mul(or,or,vec3.fromValues(n.scale[1], n.scale[1], n.scale[1]));
-                vec3.add(newPos, n.position, or);
-                nine.position = vec3.fromValues(newPos[0], newPos[1], newPos[2]);
-                p = this.rotateTurtle(-90, nine);
-                e = new Edge(nine.position, nine.orientation, nine.scale[1], nine.scale[0]);
-                
-                end1 = vec3.fromValues(0,0,0);
-                o = vec3.fromValues(nine.orientation[0], nine.orientation[1], nine.orientation[2]);
-                vec3.mul(o,o,vec3.fromValues(nine.scale[1], nine.scale[1], nine.scale[1]));
-                vec3.add(end1, nine.position, o);
+            if (j != 3.0) {
+                let nine = new Turtle();
+            nine.copy(n);
+            let newPos = vec3.fromValues(0,0,0);
+            let or = vec3.fromValues(n.orientation[0], n.orientation[1], n.orientation[2]);
+            vec3.mul(or,or,vec3.fromValues(n.scale[1], n.scale[1], n.scale[1]));
+            vec3.add(newPos, n.position, or);
+            nine.position = vec3.fromValues(newPos[0], newPos[1], newPos[2]);
+            p = this.rotateTurtle(-90, nine);
+            e = new Edge(nine.position, nine.orientation, nine.scale[1], nine.scale[0]);
             
-                inRange = this.inRange(nine.position) && this.inRange(end1);
-                w = this.isInWater(nine.position) && this.isInWater(end1);
-                
-                if (inRange && !w) {
-                    let length = e.length;
-                    this.intersect(e);
-                if (e.length < length) {
-                    scale.push(vec3.fromValues(nine.scale[0],e.length,nine.scale[2]));
-                } else {
-                    scale.push(vec3.fromValues(nine.scale[0],length,nine.scale[0]));
-                }
-                pos.push(p[0]);
-                r1.push(p[1]);
-                r2.push(p[2]);
-                r3.push(p[3]);
-                depth.push(p[5]);
-                this.edges.push(e);
-                }
+            end1 = vec3.fromValues(0,0,0);
+            o = vec3.fromValues(nine.orientation[0], nine.orientation[1], nine.orientation[2]);
+            vec3.mul(o,o,vec3.fromValues(nine.scale[1], nine.scale[1], nine.scale[1]));
+            vec3.add(end1, nine.position, o);
+        
+            inRange = this.inRange(nine.position) && this.inRange(end1);
+            w = this.isInWater(nine.position) && this.isInWater(end1);
+            
+            if (inRange && !w) {
+                let length = e.length;
+                this.intersect(e);
+            if (e.length < length) {
+                scale.push(vec3.fromValues(nine.scale[0],e.length,nine.scale[2]));
+            } else {
+                scale.push(vec3.fromValues(nine.scale[0],length,nine.scale[0]));
+            }
+            pos.push(p[0]);
+            r1.push(p[1]);
+            r2.push(p[2]);
+            r3.push(p[3]);
+            depth.push(p[5]);
+            this.edges.push(e);
+            streets.push(e);
+            }
+            }
+            
             }
  
+        }
+
+        for (let k = 0; k < streets.length; k++) {
+            this.snap(streets[k]);
         }
 
         let container : vec3[][] = new Array();
@@ -698,64 +644,15 @@ export default class RoadSystem {
 
     }
 
-    moveForward(t : Turtle) : vec3[] {
-        t.moveForward(0.1);
-        //console.log("hi!");
-        //console.log("Moving along curr forward: (" + t.forward[0] + ", " + t.forward[1] + ", " + t.forward[2] + ")");
-
-        let tPos = vec3.fromValues(t.position[0], t.position[1], t.position[2]);
-        let tScale = vec3.fromValues(t.scale[0], t.scale[1], t.scale[2]);
-
-         let rotation : mat3 = mat3.fromValues(1,0,0,0,1,0,0,0,1);
-        // let angle = vec3.dot(t.orientation, vec3.fromValues(0,1,0));
-        // let axis = vec3.fromValues(0,0,0);
-        // vec3.cross(axis, t.orientation, vec3.fromValues(0,1,0));
-        // mat4.rotate(rotation, rotation, angle, axis);
-
-        var q = quat.fromValues(0,0,0,0);
-        quat.rotationTo(q,vec3.fromValues(0,1,0), t.orientation);
-
-        mat3.fromQuat(rotation, q);
-
-        let r1 = vec3.fromValues(rotation[0], rotation[1], rotation[2]);
-        let r2 = vec3.fromValues(rotation[3], rotation[4], rotation[5]);
-        let r3 = vec3.fromValues(rotation[6], rotation[7], rotation[8]);
-
-        //save depth so main knows whether to draw a branch or a leaf
-        let depth = vec3.fromValues(t.depth, 0, 0);
-
-        let result = new Array();
-        result.push(tPos);
-        result.push(r1);
-        result.push(r2);
-        result.push(r3);
-        result.push(tScale);
-        result.push(depth);
-
-        return result;
-    }
-
     //case 1 for rotate about up for testing
     rotateTurtle(theta : number, t :Turtle) : vec3[] {
-        //console.log("Old Orientation: " + t.orientation[0] + ", " + t.orientation[1] + ", " + t.orientation[2]);
-        // let endpt = vec3.fromValues(0,0,0);
-        // let o = vec3.fromValues(t.orientation[0], t.orientation[1], t.orientation[2]);
-        // vec3.mul(o,o,vec3.fromValues(t.scale[1], t.scale[1], t.scale[1]));
-        // vec3.add(endpt, t.position, o);
-        // t.position = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-        // console.log("Rotate pos change: " + t.position[0] + ", " + t.position[1] + ", " + t.position[2]);
         t.moveRotate(1, theta);
         t.orientation = t.orientation;
-        //console.log("New Orientation: " + t.orientation[0] + ", " + t.orientation[1] + ", " + t.orientation[2]);
-
+        
         let tPos = vec3.fromValues(t.position[0], t.position[1], t.position[2]);
         let tScale = vec3.fromValues(t.scale[0], t.scale[1], t.scale[2]);
 
          let rotation : mat3 = mat3.fromValues(1,0,0,0,1,0,0,0,1);
-        // let angle = vec3.dot(t.orientation, vec3.fromValues(0,1,0));
-        // let axis = vec3.fromValues(0,0,0);
-        // vec3.cross(axis, t.orientation, vec3.fromValues(0,1,0));
-        // mat4.rotate(rotation, rotation, angle, axis);
 
         var q = quat.fromValues(0,0,0,0);
         quat.rotationTo(q,vec3.fromValues(0,1,0), t.orientation);

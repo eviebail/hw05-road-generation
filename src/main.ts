@@ -12,10 +12,12 @@ import RoadSystem from './RoadSystem';
 // Define an object with application parameters and button callbacks
 // This will be referred to by dat.GUI's functions that add GUI elements.
 const controls = {
-  Height_Map:  0,
-  Density_Map: 1,
+  Height_Map:  1,
+  Density_Map: 0,
   Land_Water_Mode: 0,
-  Population_Density: 0
+  Population_Density: 0,
+  Road_Density: 20,
+  Water_Level: 1
 };
 
 let square: Square;
@@ -32,6 +34,7 @@ function loadScene() {
   // offsets and gradiated colors for a 100x100 grid
   // of squares, even though the VBO data for just
   // one square is actually passed to the GPU
+  system.setMaxLength(controls.Road_Density);
   let data = system.runSystem();
 
   let offsetsArray = [];
@@ -42,8 +45,6 @@ function loadScene() {
   let scaleArray = [];
   
   let n: number = data[0].length;
-
-  console.log("Length " + n);
   
   for(let i = 0; i < n; i++) {
     var pos = vec3.create();
@@ -53,7 +54,6 @@ function loadScene() {
       let r2 : vec3 = data[2][i];
       let r3 : vec3 = data[3][i];
       let scale : vec3 = data[4][i];
-      //let depth : vec3 = data[5][i];
 
       pos = position;
       
@@ -90,8 +90,6 @@ function loadScene() {
       }
 
     }
-    //console.log("HIII");
-    //console.log("Offset: " + pos[0] + ", " + pos[1] + ", " + pos[2] + "\n");
   }
   let offsets: Float32Array = new Float32Array(offsetsArray);
   let colors: Float32Array = new Float32Array(colorsArray);
@@ -103,62 +101,10 @@ function loadScene() {
   square.setNumInstances(n * n); // grid of "particles"
 }
 
-function main() {
-  // Initial display for framerate
-  const stats = Stats();
-  stats.setMode(0);
-  stats.domElement.style.position = 'absolute';
-  stats.domElement.style.left = '0px';
-  stats.domElement.style.top = '0px';
-  document.body.appendChild(stats.domElement);
-
-  // Add controls to the gui
-  const gui = new DAT.GUI();
-  gui.add(controls, 'Height_Map', 0, 1).step(1);
-  gui.add(controls, 'Density_Map', 0, 1).step(1);
-  gui.add(controls, 'Land_Water_Mode', 0, 1).step(1);
-  gui.add(controls, 'Population_Density', 0, 1).step(0.5);//Population_Density
-
-  // get canvas and webgl context
-  const canvas = <HTMLCanvasElement> document.getElementById('canvas');
-  const gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
-  if (!gl) {
-    alert('WebGL 2 not supported!');
-  }
-  // `setGL` is a function imported above which sets the value of `gl` in the `globals.ts` module.
-  // Later, we can import `gl` from `globals.ts` to access it
-  setGL(gl);
-
-
-  const camera = new Camera(vec3.fromValues(10, 10, 10), vec3.fromValues(0, 0, 0));
-
-  const renderer = new OpenGLRenderer(canvas);
-  renderer.setClearColor(0.2, 0.2, 0.2, 1);
-  // gl.enable(gl.BLEND);
-  // gl.blendFunc(gl.ONE, gl.ONE); // Additive blending
-  gl.enable(gl.DEPTH_TEST);
-
-  const instancedShader = new ShaderProgram([
-    new Shader(gl.VERTEX_SHADER, require('./shaders/instanced-vert.glsl')),
-    new Shader(gl.FRAGMENT_SHADER, require('./shaders/instanced-frag.glsl')),
-  ]);
-
-  const flat = new ShaderProgram([
-    new Shader(gl.VERTEX_SHADER, require('./shaders/flat-vert.glsl')),
-    new Shader(gl.FRAGMENT_SHADER, require('./shaders/flat-frag.glsl')),
-  ]);
-
-  const textureBuffer = new ShaderProgram([
-    new Shader(gl.VERTEX_SHADER, require('./shaders/flat-vert.glsl')),
-    new Shader(gl.FRAGMENT_SHADER, require('./shaders/texture-frag.glsl')),
-  ]);
-
+function loadTexture(camera : Camera, textureBuffer : ShaderProgram, renderer : OpenGLRenderer,
+  gl : WebGL2RenderingContext, m_renderedTexture : WebGLTexture, m_depthRenderBuffer : WebGLRenderbuffer,
+  m_frameBuffer : WebGLRenderbuffer) {
   screenQuad.create();
-
-  /////////////CREATE RENDER BUFFERS///////////////////////////////
-  var m_renderedTexture = gl.createTexture();
-  var m_depthRenderBuffer = gl.createRenderbuffer();
-  var m_frameBuffer = gl.createFramebuffer();
 
   gl.bindFramebuffer(gl.FRAMEBUFFER, m_frameBuffer);
     // Bind our texture so that all functions that deal with textures will interact with this one
@@ -202,6 +148,9 @@ function main() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     // Draw the model
+    //but first set our req unif variables~
+    let state = vec4.fromValues(controls.Population_Density, controls.Water_Level, 0, 0);
+    textureBuffer.setState(state);
     //mp_progSurfaceCurrent->draw(*mp_modelCurrent, 0);
     renderer.render(camera, textureBuffer, [screenQuad]);
 
@@ -210,36 +159,113 @@ function main() {
     if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) == gl.FRAMEBUFFER_COMPLETE) {
       var pixels = new Uint8Array(window.innerWidth * window.innerHeight * 4);
       gl.readPixels(0, 0, window.innerWidth, window.innerHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      //console.log(pixels[window.innerWidth * window.innerHeight * 4 - 4] / 255.0 + ", " + pixels[window.innerWidth * window.innerHeight * 4 - 3] / 255.0 + ", " + pixels[window.innerWidth * window.innerHeight * 4 - 2] / 255.0);
       //now pass colorArray to turtle!
-      //console.log("ARE YOU ALIVE???" + colorArray[0][0]);
       system = new RoadSystem(pixels,5.0, window.innerHeight, window.innerWidth);
     }
+}
 
-    // Initial call to load scene
-    loadScene();
+function load(camera : Camera, textureBuffer : ShaderProgram, renderer : OpenGLRenderer,
+  gl : WebGL2RenderingContext, m_renderedTexture : WebGLTexture, m_depthRenderBuffer : WebGLRenderbuffer,
+  m_frameBuffer : WebGLRenderbuffer) {
+  loadTexture(camera, textureBuffer, renderer, gl, m_renderedTexture, m_depthRenderBuffer, m_frameBuffer);
+  loadScene();
+      // Tell OpenGL to render to the viewport's frame buffer
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      // Render on the whole framebuffer, complete from the lower left corner to the upper right
+      gl.viewport(0,0,window.innerWidth, window.innerHeight);
+      // Clear the screen
+      gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      // Bind our texture in Texture Unit 0
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, m_renderedTexture);
+}
 
-    // Tell OpenGL to render to the viewport's frame buffer
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    // Render on the whole framebuffer, complete from the lower left corner to the upper right
-    gl.viewport(0,0,window.innerWidth, window.innerHeight);
-    // Clear the screen
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // Bind our texture in Texture Unit 0
-    gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, m_renderedTexture);
+function main() {
+  // Initial display for framerate
+  const stats = Stats();
+  stats.setMode(0);
+  stats.domElement.style.position = 'absolute';
+  stats.domElement.style.left = '0px';
+  stats.domElement.style.top = '0px';
+  document.body.appendChild(stats.domElement);
 
-    
+  // Add controls to the gui
+  const gui = new DAT.GUI();
+  gui.add(controls, 'Height_Map', 0, 1).step(1);
+  gui.add(controls, 'Density_Map', 0, 1).step(1);
+  gui.add(controls, 'Land_Water_Mode', 0, 1).step(1);
+  gui.add(controls, 'Population_Density', 0, 1).step(0.5);
+  gui.add(controls, 'Road_Density', 0, 100).step(1.0);
+  gui.add(controls, 'Water_Level', 0, 2).step(1.0);
+
+  // get canvas and webgl context
+  const canvas = <HTMLCanvasElement> document.getElementById('canvas');
+  const gl = <WebGL2RenderingContext> canvas.getContext('webgl2');
+  if (!gl) {
+    alert('WebGL 2 not supported!');
+  }
+  // `setGL` is a function imported above which sets the value of `gl` in the `globals.ts` module.
+  // Later, we can import `gl` from `globals.ts` to access it
+  setGL(gl);
+
+
+  const camera = new Camera(vec3.fromValues(10, 10, 10), vec3.fromValues(0, 0, 0));
+
+  const renderer = new OpenGLRenderer(canvas);
+  renderer.setClearColor(0.2, 0.2, 0.2, 1);
+  // gl.enable(gl.BLEND);
+  // gl.blendFunc(gl.ONE, gl.ONE); // Additive blending
+  gl.enable(gl.DEPTH_TEST);
+
+  const instancedShader = new ShaderProgram([
+    new Shader(gl.VERTEX_SHADER, require('./shaders/instanced-vert.glsl')),
+    new Shader(gl.FRAGMENT_SHADER, require('./shaders/instanced-frag.glsl')),
+  ]);
+
+  const flat = new ShaderProgram([
+    new Shader(gl.VERTEX_SHADER, require('./shaders/flat-vert.glsl')),
+    new Shader(gl.FRAGMENT_SHADER, require('./shaders/flat-frag.glsl')),
+  ]);
+
+  const textureBuffer = new ShaderProgram([
+    new Shader(gl.VERTEX_SHADER, require('./shaders/flat-vert.glsl')),
+    new Shader(gl.FRAGMENT_SHADER, require('./shaders/texture-frag.glsl')),
+  ]);
+
+  var m_renderedTexture = gl.createTexture();
+  var m_depthRenderBuffer = gl.createRenderbuffer();
+  var m_frameBuffer = gl.createFramebuffer();
+
+    load(camera, textureBuffer, renderer, gl, m_renderedTexture, m_depthRenderBuffer, m_frameBuffer);
 
   // This function will be called every frame
+  let prevPop = controls.Population_Density;
+  let prevRoad = controls.Road_Density;
+  let prevWater = controls.Water_Level;
   function tick() {
+    let popChanged : boolean = false;
+    if (controls.Population_Density - prevPop != 0.0) {
+      prevPop = controls.Population_Density;
+      let state = vec4.fromValues(controls.Population_Density, controls.Water_Level, 0, 0);
+      textureBuffer.setState(state);
+      load(camera, textureBuffer, renderer, gl, m_renderedTexture, m_depthRenderBuffer, m_frameBuffer);
+    }
+    if (controls.Road_Density - prevRoad != 0.0) {
+      prevRoad = controls.Road_Density;
+      load(camera, textureBuffer, renderer, gl, m_renderedTexture, m_depthRenderBuffer, m_frameBuffer);
+    }
+    if (controls.Water_Level - prevWater != 0.0) {
+      prevWater = controls.Water_Level;
+      let state = vec4.fromValues(controls.Population_Density, controls.Water_Level, 0, 0);
+      textureBuffer.setState(state);
+      load(camera, textureBuffer, renderer, gl, m_renderedTexture, m_depthRenderBuffer, m_frameBuffer);
+    }
     camera.update();
     stats.begin();
     instancedShader.setTime(time);
     flat.setTime(time++);
     flat.setState(vec4.fromValues(controls.Height_Map,controls.Density_Map,(controls.Height_Map + controls.Density_Map) - 1.0, controls.Land_Water_Mode));
     gl.viewport(0, 0, window.innerWidth, window.innerHeight);
-    //renderer.clear();
 
     renderer.render(camera, flat, [screenQuad]);
     renderer.render(camera, instancedShader, [

@@ -11,6 +11,7 @@ class Square extends Drawable {
   r2s: Float32Array;
   r3s: Float32Array;
   scales: Float32Array;
+  states: Float32Array;
 
 
   constructor() {

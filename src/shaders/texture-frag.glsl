@@ -4,6 +4,7 @@ precision highp float;
 uniform vec3 u_Eye, u_Ref, u_Up;
 uniform vec2 u_Dimensions;
 uniform float u_Time;
+uniform vec4 u_MapState;
 
 in vec2 fs_Pos;
 out vec4 out_Col;
@@ -65,9 +66,9 @@ vec2 random3( vec2 p ) {
     return fract(sin(vec2(dot(p,vec2(127.1,311.7)),dot(p,vec2(269.5,183.3))))*43758.5453);
 }
 
-float worley (float c_size, float multiplier) {
+float worley (float c_size, float multiplier, vec2 pos) {
   float cell_size = c_size;
-  vec2 cell = fs_Pos.xy / cell_size;
+  vec2 cell = pos.xy / cell_size;
   float noise = 0.f;
   
   //get the cell pixel position is in
@@ -101,14 +102,36 @@ float worley (float c_size, float multiplier) {
 void main() {
   vec2 pos = fs_Pos * 2.0;
   float height = fbm(pos.x, pos.y);
-  float pop_dens = 1.0 - (worley(0.5, 0.5) + 0.5*height);
-  pop_dens = fbm(pop_dens, pop_dens);
-  //height = step_map(height);
-  height = log(height + 0.7);//pow(height, 0.8);//smoothstep(0.2, 1.0, height);
-  if (height < 0.2) {
+  float pop_dens = 0.f;
+  if (u_MapState.x == 0.f) {
+      pop_dens = 1.0 - (worley(0.5, 0.5, fs_Pos.xy) + 0.5*height);
+      pop_dens = fbm(pop_dens, pop_dens);
+  } else if (u_MapState.x == 0.5) {
+      pop_dens = 1.0 - worley(0.4, 1.5, vec2(fs_Pos.x - 19.f, fs_Pos.y));
+      pop_dens = fbm(pop_dens, pop_dens);
+      pop_dens = step_map(pop_dens);
+  } else {
+    pop_dens = fbm(pos.x * 1.5f - 20.f, pos.y * 2.5f - 5.f);
+    pop_dens = worley(0.5, 1.5, vec2(pop_dens, pop_dens));
+    pop_dens = pow(pop_dens, 0.5);
+  }
+
+  height = log(height + 0.7);
+
+  float height_control = 0.0;
+
+  if (u_MapState.y == 0.0) {
+    height_control = 0.1;
+  } else if (u_MapState.y == 1.0) {
+    height_control = 0.2;
+  } else {
+    height_control = 0.3;
+  }
+
+  if (height < height_control) {
     pop_dens = 0.0;
     out_Col = vec4(0.0,0.0,0.5, pop_dens);
-  } else if (height < 0.3) {
+  } else if (height < height_control + 0.1) {
     pop_dens = 0.0;
     vec3 col = mix(vec3(0.0,0.0,0.5), vec3(0.0,height,0.0), 0.2);
     out_Col = vec4(col, pop_dens);

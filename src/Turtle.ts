@@ -30,7 +30,6 @@ export default class Turtle {
     } else {
       this.position = pos4;
     }
-    //(Math.random() * 2.0 - 1.0,Math.random() * 2.0 - 1.0,Math.random()* 2.0 - 1.0);
     this.orientation = vec3.fromValues(0,1,0);
     this.forward = vec3.fromValues(0,1,0);
     this.right = vec3.fromValues(1,0,0);

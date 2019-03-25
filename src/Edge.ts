@@ -21,10 +21,6 @@ export default class Edge {
         vec3.mul(o,o,vec3.fromValues(length, length, length));
         vec3.add(endpt, this.v1, o);
         this.v2 = vec3.fromValues(endpt[0], endpt[1], endpt[2]);
-        //vec3.add(this.v2, this.v2, vec3.add(vec3.create(), origin, vec3.mul(vec3.create(), [length, length, length], direction)));
-        //console.log("End2: " + this.v2[0] + ", " + this.v2[1] + ", " + this.v2[2]);
-        // console.log("In Edge, v1 is (" + this.v1[0] + ", " + this.v1[1] +
-        // ") and v2 is (" + this.v2[0] + ", " + this.v2[1] + ")");
     }
 
     setAxes(f : vec3, r : vec3, u : vec3) {
